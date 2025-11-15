@@ -1,95 +1,130 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
+  <meta charset="UTF-8" />
   <title>Top 25 Live Scoreboard</title>
+
   <style>
-    body { margin:0; background:#111; color:#fff; font-family:Arial; }
+    body { margin:0; background:#111; color:#fff; font-family:Arial, sans-serif; }
+
+    #status {
+      padding:10px;
+      background:#181818;
+      border-bottom:1px solid #333;
+      font-size:14px;
+    }
+
     #grid {
       display:grid;
-      grid-template-columns:repeat(6,1fr);
-      gap:12px; padding:20px;
+      grid-template-columns:repeat(6, 1fr);
+      gap:12px;
+      padding:20px;
     }
+
     .card {
       background:#1e1e1e;
       padding:12px;
       border-radius:10px;
     }
-    .team { display:flex; justify-content:space-between; font-size:18px; }
-    .meta { font-size:12px; opacity:0.7; margin-top:6px; }
+
+    .team {
+      display:flex;
+      justify-content:space-between;
+      font-size:16px;
+      margin-bottom:4px;
+    }
+
+    .meta {
+      font-size:12px;
+      opacity:0.7;
+      margin-top:6px;
+    }
+
     .live { color:#0f0; font-weight:bold; }
     .final { color:#f66; }
   </style>
 </head>
 
 <body>
-<h2 style="padding:10px">Top 25 Live Scoreboard</h2>
+
+<div id="status">Loading Top 25 Scores…</div>
 <div id="grid"></div>
 
 <script>
-// JSONP loader
-function loadJSONP(url) {
-  return new Promise(resolve => {
-    const cb = "cb" + Math.floor(Math.random()*99999);
-    window[cb] = data => resolve(data);
-    const script = document.createElement("script");
-    script.src = url + "?callback=" + cb;
-    document.body.appendChild(script);
-  });
-}
-
+// ESPN → CORS Proxy → Browser
 async function loadScores() {
-  const data = await loadJSONP("https://site.web.api.espn.com/apis/v2/sports/football/college-football/scoreboard");
+  try {
+    document.getElementById("status").textContent = "Updating…";
 
-  const events = data.events || [];
-  const top25 = events.filter(ev =>
-    ev.competitions[0].competitors.some(t => t.rank && t.rank <= 25)
-  );
+    const proxyURL = "https://api.allorigins.win/get?url=" + 
+      encodeURIComponent("https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard");
 
-  const grid = document.getElementById("grid");
-  grid.innerHTML = "";
+    const res = await fetch(proxyURL);
+    const wrapped = await res.json();
+    const data = JSON.parse(wrapped.contents);
 
-  top25.forEach(ev => {
-    const comp = ev.competitions[0];
-    const c1 = comp.competitors[0];
-    const c2 = comp.competitors[1];
+    const events = data.events || [];
 
-    const home = c1.homeAway === "home" ? c1 : c2;
-    const away = c1.homeAway === "away" ? c1 : c2;
+    // Filter to Top-25 games
+    const top25 = events.filter(ev =>
+      ev.competitions[0].competitors.some(t => t.rank && t.rank <= 25)
+    );
 
-    const s = ev.status;
-    let statusLabel = "";
-    let statusClass = "";
+    const grid = document.getElementById("grid");
+    grid.innerHTML = "";
 
-    if (s.type.name === "STATUS_IN_PROGRESS") {
-      statusClass = "live";
-      statusLabel = `${s.period}Q ${s.displayClock}`;
-    } else if (s.type.name === "STATUS_FINAL") {
-      statusClass = "final";
-      statusLabel = "Final";
-    } else {
-      statusLabel = new Date(ev.date).toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
-    }
+    top25.forEach(ev => {
+      const comp = ev.competitions[0];
+      const c1 = comp.competitors[0];
+      const c2 = comp.competitors[1];
 
-    const card = document.createElement("div");
-    card.className = "card";
-    card.innerHTML = `
-      <div class="team">
-        <span>${away.rank ? "#" + away.rank + " " : ""}${away.team.displayName}</span>
-        <strong>${away.score ?? "-"}</strong>
-      </div>
-      <div class="team">
-        <span>${home.rank ? "#" + home.rank + " " : ""}${home.team.displayName}</span>
-        <strong>${home.score ?? "-"}</strong>
-      </div>
-      <div class="meta ${statusClass}">
-        ${statusLabel}
-      </div>
-    `;
-    grid.appendChild(card);
-  });
+      const home = c1.homeAway === "home" ? c1 : c2;
+      const away = c1.homeAway === "away" ? c1 : c2;
+
+      const s = ev.status;
+      let statusLabel = "";
+      let statusClass = "";
+
+      if (s.type.name === "STATUS_IN_PROGRESS") {
+        statusClass = "live";
+        statusLabel = `${s.period}Q • ${s.displayClock}`;
+      } else if (s.type.name === "STATUS_FINAL") {
+        statusClass = "final";
+        statusLabel = "Final";
+      } else {
+        statusLabel = new Date(ev.date).toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
+      }
+
+      const card = document.createElement("div");
+      card.className = "card";
+
+      card.innerHTML = `
+        <div class="team">
+          <span>${away.rank ? "#" + away.rank + " " : ""}${away.team.displayName}</span>
+          <strong>${away.score ?? "-"}</strong>
+        </div>
+        <div class="team">
+          <span>${home.rank ? "#" + home.rank + " " : ""}${home.team.displayName}</span>
+          <strong>${home.score ?? "-"}</strong>
+        </div>
+        <div class="meta ${statusClass}">
+          ${statusLabel}
+        </div>
+      `;
+
+      grid.appendChild(card);
+    });
+
+    document.getElementById("status").textContent = 
+      `Top 25 Scoreboard (${top25.length} games)`;
+
+  } catch (err) {
+    console.error(err);
+    document.getElementById("status").textContent = "Error loading scores";
+  }
 }
 
+// Load immediately and refresh every 15 seconds
 loadScores();
 setInterval(loadScores, 15000);
 </script>
