@@ -1,100 +1,98 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
-<title>Top 25 Live Scoreboard</title>
+<title>Top 25 Scoreboard</title>
+
 <style>
   body { margin:0; background:#111; color:#fff; font-family:Arial; }
-  #status { padding:10px; background:#181818; border-bottom:1px solid #333; }
+  h2 { padding:12px; margin:0; }
   #grid {
     display:grid;
     grid-template-columns:repeat(6,1fr);
     gap:12px;
-    padding:20px;
+    padding:12px;
   }
-  .card { background:#1e1e1e; padding:12px; border-radius:10px; }
-  .team { display:flex; justify-content:space-between; }
+  .card {
+    background:#1e1e1e;
+    padding:12px;
+    border-radius:10px;
+  }
+  .team { display:flex; justify-content:space-between; font-size:16px; }
   .meta { margin-top:6px; font-size:12px; opacity:0.7; }
-  .live { color:#0f0; }
-  .final { color:#f66; }
+  .live { color:#0f0; font-weight:bold; }
+  .final { color:#f55; }
 </style>
 </head>
 
 <body>
 
-<div id="status">Loading Top 25 Scores…</div>
+<h2>Top 25 Scoreboard</h2>
 <div id="grid"></div>
 
 <script>
+// JSONP loader
+function loadJSONP(url) {
+  return new Promise(resolve => {
+    const cb = "cb" + Math.floor(Math.random()*99999);
+    window[cb] = data => resolve(data);
+    const script = document.createElement("script");
+    script.src = url + "?callback=" + cb;   // IMPORTANT
+    document.body.appendChild(script);
+  });
+}
+
 async function loadScores() {
-  try {
-    document.getElementById("status").textContent = "Updating…";
+  const url = "https://site.api.espn.com/apis/v2/sports/football/college-football/scoreboard";
+  const data = await loadJSONP(url);
 
-    // ESPN core API (CORS SAFE)
-    const url = "https://sports.core.api.espn.com/v2/sports/football/leagues/college-football/events?limit=250";
+  const events = data.events || [];
 
-    const res = await fetch(url);
-    const data = await res.json();
+  const top25 = events.filter(ev =>
+    ev.competitions[0].competitors.some(t => t.rank && t.rank <= 25)
+  );
 
-    const eventUrls = data.items.map(i => i.$ref);
+  const grid = document.getElementById("grid");
+  grid.innerHTML = "";
 
-    // Load each event
-    const events = await Promise.all(eventUrls.map(u => fetch(u).then(r => r.json())));
+  top25.forEach(ev => {
+    const comp = ev.competitions[0];
+    const c1 = comp.competitors[0];
+    const c2 = comp.competitors[1];
 
-    // Filter Top 25 teams
-    const top25 = events.filter(ev =>
-      ev.competitions[0].competitors.some(t => t.rank && t.rank <= 25)
-    );
+    const home = c1.homeAway === "home" ? c1 : c2;
+    const away = c1.homeAway === "away" ? c1 : c2;
 
-    const grid = document.getElementById("grid");
-    grid.innerHTML = "";
+    let statusClass = "";
+    let statusLabel = "";
+    
+    const s = ev.status;
 
-    top25.forEach(ev => {
-      const comp = ev.competitions[0];
-      const c1 = comp.competitors[0];
-      const c2 = comp.competitors[1];
+    if (s.type.name === "STATUS_IN_PROGRESS") {
+      statusClass = "live";
+      statusLabel = `${s.period}Q ${s.displayClock}`;
+    } else if (s.type.name === "STATUS_FINAL") {
+      statusClass = "final";
+      statusLabel = "Final";
+    } else {
+      statusLabel = new Date(ev.date).toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
+    }
 
-      const home = c1.homeAway === "home" ? c1 : c2;
-      const away = c1.homeAway === "away" ? c1 : c2;
-
-      const s = ev.status;
-      let statusLabel = "";
-      let statusClass = "";
-
-      if (s.type === "in") {
-        statusClass = "live";
-        statusLabel = `${s.period}Q • ${s.clock}`;
-      } else if (s.type === "post") {
-        statusClass = "final";
-        statusLabel = "Final";
-      } else {
-        statusLabel = new Date(ev.date).toLocaleTimeString([], { hour:"numeric", minute:"2-digit" });
-      }
-
-      const card = document.createElement("div");
-      card.className = "card";
-      card.innerHTML = `
-        <div class="team">
-          <span>${away.rank ? "#" + away.rank + " " : ""}${away.team.displayName}</span>
-          <strong>${away.score ?? "-"}</strong>
-        </div>
-        <div class="team">
-          <span>${home.rank ? "#" + home.rank + " " : ""}${home.team.displayName}</span>
-          <strong>${home.score ?? "-"}</strong>
-        </div>
-        <div class="meta ${statusClass}">${statusLabel}</div>
-      `;
-
-      grid.appendChild(card);
-    });
-
-    document.getElementById("status").textContent =
-      `Top 25 Scoreboard (${top25.length} games)`;
-
-  } catch (err) {
-    console.error(err);
-    document.getElementById("status").textContent = "Error loading scores";
-  }
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <div class="team">
+        <span>${away.rank ? "#" + away.rank + " " : ""}${away.team.displayName}</span>
+        <strong>${away.score ?? "-"}</strong>
+      </div>
+      <div class="team">
+        <span>${home.rank ? "#" + home.rank + " " : ""}${home.team.displayName}</span>
+        <strong>${home.score ?? "-"}</strong>
+      </div>
+      <div class="meta ${statusClass}">${statusLabel}</div>
+    `;
+    grid.appendChild(card);
+  });
 }
 
 loadScores();
