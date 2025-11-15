@@ -1,46 +1,22 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>Top 25 Live Scoreboard</title>
 
   <style>
-    body { margin:0; background:#111; color:#fff; font-family:Arial, sans-serif; }
-
-    #status {
-      padding:10px;
-      background:#181818;
-      border-bottom:1px solid #333;
-      font-size:14px;
-    }
-
+    body { margin:0; background:#111; color:#fff; font-family:Arial; }
+    #status { padding:10px; background:#181818; border-bottom:1px solid #333; }
     #grid {
       display:grid;
-      grid-template-columns:repeat(6, 1fr);
+      grid-template-columns:repeat(6,1fr);
       gap:12px;
       padding:20px;
     }
-
-    .card {
-      background:#1e1e1e;
-      padding:12px;
-      border-radius:10px;
-    }
-
-    .team {
-      display:flex;
-      justify-content:space-between;
-      font-size:16px;
-      margin-bottom:4px;
-    }
-
-    .meta {
-      font-size:12px;
-      opacity:0.7;
-      margin-top:6px;
-    }
-
-    .live { color:#0f0; font-weight:bold; }
+    .card { background:#1e1e1e; padding:12px; border-radius:10px; }
+    .team { display:flex; justify-content:space-between; }
+    .meta { margin-top:6px; font-size:12px; opacity:0.7; }
+    .live { color:#0f0; }
     .final { color:#f66; }
   </style>
 </head>
@@ -51,21 +27,18 @@
 <div id="grid"></div>
 
 <script>
-// ESPN → CORS Proxy → Browser
 async function loadScores() {
   try {
     document.getElementById("status").textContent = "Updating…";
 
-    const proxyURL = "https://api.allorigins.win/get?url=" + 
-      encodeURIComponent("https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard");
+    const proxy = "https://cors-anywhere.herokuapp.com/";
+    const espnURL = "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard";
 
-    const res = await fetch(proxyURL);
-    const wrapped = await res.json();
-    const data = JSON.parse(wrapped.contents);
+    const res = await fetch(proxy + espnURL);
+    const data = await res.json();
 
     const events = data.events || [];
 
-    // Filter to Top-25 games
     const top25 = events.filter(ev =>
       ev.competitions[0].competitors.some(t => t.rank && t.rank <= 25)
     );
@@ -97,7 +70,6 @@ async function loadScores() {
 
       const card = document.createElement("div");
       card.className = "card";
-
       card.innerHTML = `
         <div class="team">
           <span>${away.rank ? "#" + away.rank + " " : ""}${away.team.displayName}</span>
@@ -107,15 +79,13 @@ async function loadScores() {
           <span>${home.rank ? "#" + home.rank + " " : ""}${home.team.displayName}</span>
           <strong>${home.score ?? "-"}</strong>
         </div>
-        <div class="meta ${statusClass}">
-          ${statusLabel}
-        </div>
+        <div class="meta ${statusClass}">${statusLabel}</div>
       `;
 
       grid.appendChild(card);
     });
 
-    document.getElementById("status").textContent = 
+    document.getElementById("status").textContent =
       `Top 25 Scoreboard (${top25.length} games)`;
 
   } catch (err) {
@@ -124,7 +94,6 @@ async function loadScores() {
   }
 }
 
-// Load immediately and refresh every 15 seconds
 loadScores();
 setInterval(loadScores, 15000);
 </script>
