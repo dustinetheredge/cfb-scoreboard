@@ -1,127 +1,52 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
-<title>Top 25 NCAA Scoreboard</title>
-
-<style>
-    body {
-        margin: 0;
-        background: #111;
-        color: #fff;
-        font-family: Arial, sans-serif;
-    }
-
-    h1 {
-        margin: 0;
-        padding: 16px;
-        background: #000;
-        border-bottom: 1px solid #333;
-        font-size: 24px;
-    }
-
-    #grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-        gap: 14px;
-        padding: 16px;
-    }
-
-    .card {
-        background: #1c1c1c;
-        padding: 14px;
-        border-radius: 10px;
-        border: 1px solid #333;
-    }
-
-    .team {
-        display: flex;
-        justify-content: space-between;
-        font-size: 18px;
-        margin: 4px 0;
-    }
-
-    .meta {
-        margin-top: 10px;
-        font-size: 13px;
-        opacity: 0.75;
-    }
-
-    .live { color: #00ff6a; font-weight: bold; }
-    .final { color: #ff5c5c; font-weight: bold; }
-</style>
+  <meta charset="utf-8" />
+  <title>NCAA Scoreboard Test</title>
+  <style>
+    body { background:#111; color:#fff; font-family:Arial; padding:20px; }
+    .game { background:#222; padding:15px; margin-bottom:10px; border-radius:10px; }
+    .team { display:flex; justify-content:space-between; }
+    .status { margin-top:6px; opacity:0.7; }
+  </style>
 </head>
 
 <body>
-
-<h1>Top 25 NCAA Football Scoreboard</h1>
-<div id="grid"></div>
+  <h2>NCAA Scoreboard (FBS)</h2>
+  <div id="games">Loading…</div>
 
 <script>
 async function loadScores() {
-    const url = "https://ncaa-api.henrygd.me/scoreboard?division=fbs";
+  const url =
+    "https://ncaa-api.henrygd.me/scoreboard/football/fbs/2024/01/all-conf";
 
-    let res, data;
-    try {
-        res = await fetch(url);
-        data = await res.json();
-    } catch (err) {
-        console.error("Score load failed:", err);
-        return;
-    }
+  const res = await fetch(url);
+  const data = await res.json();
 
-    const games = data.games || [];
+  const container = document.getElementById("games");
+  container.innerHTML = "";
 
-    // Only include Top 25 games
-    const top25 = games.filter(g =>
-        g.teams.some(t => t.rank && t.rank <= 25)
-    );
+  data.games.forEach(game => {
+    const div = document.createElement("div");
+    div.className = "game";
 
-    const grid = document.getElementById("grid");
-    grid.innerHTML = "";
+    div.innerHTML = `
+      <div class="team">
+        <span>${game.home.displayName}</span>
+        <strong>${game.home.score ?? "-"}</strong>
+      </div>
+      <div class="team">
+        <span>${game.away.displayName}</span>
+        <strong>${game.away.score ?? "-"}</strong>
+      </div>
+      <div class="status">${game.status?.type?.detail ?? ""}</div>
+    `;
 
-    top25.forEach(game => {
-        const home = game.teams.find(t => t.home_away === "home");
-        const away = game.teams.find(t => t.home_away === "away");
-
-        let statusClass = "";
-        let statusLabel = game.status?.type || "Scheduled";
-
-        if (game.status?.type === "in") {
-            statusClass = "live";
-            statusLabel = `${game.status.current_period}Q — ${game.status.display_clock}`;
-        }
-        if (game.status?.type === "final") {
-            statusClass = "final";
-            statusLabel = "Final";
-        }
-
-        const card = document.createElement("div");
-        card.className = "card";
-
-        card.innerHTML = `
-            <div class="team">
-                <span>${away.rank ? "#" + away.rank + " " : ""}${away.school}</span>
-                <strong>${away.points ?? "-"}</strong>
-            </div>
-            <div class="team">
-                <span>${home.rank ? "#" + home.rank + " " : ""}${home.school}</span>
-                <strong>${home.points ?? "-"}</strong>
-            </div>
-
-            <div class="meta ${statusClass}">
-                ${statusLabel}
-            </div>
-        `;
-
-        grid.appendChild(card);
-    });
+    container.appendChild(div);
+  });
 }
 
-// Load immediately, refresh every 15s
 loadScores();
-setInterval(loadScores, 15000);
 </script>
-
 </body>
 </html>
