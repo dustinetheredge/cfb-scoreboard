@@ -123,7 +123,10 @@
       try {
         statusText.textContent = "Updating…";
 
-        const url = "https://site.web.api.espn.com/apis/v2/sports/football/college-football/scoreboard";
+        // ⭐ FIX: Working CORS proxy to allow ESPN requests
+        const url =
+          "https://corsproxy.io/?https://site.web.api.espn.com/apis/v2/sports/football/college-football/scoreboard";
+
         const res = await fetch(url);
         const data = await res.json();
 
@@ -144,7 +147,7 @@
           const home = c1.homeAway === "home" ? c1 : c2;
           const away = c1.homeAway === "away" ? c1 : c2;
 
-          const status = ev.status.type.name; // STATUS_FINAL, STATUS_IN_PROGRESS, STATUS_SCHEDULED
+          const status = ev.status.type.name;
 
           let statusLabel = "";
           let statusClass = "";
@@ -157,7 +160,9 @@
             statusLabel = "Final";
           } else {
             statusClass = "scheduled";
-            statusLabel = ev.date ? new Date(ev.date).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "Scheduled";
+            statusLabel = ev.date
+              ? new Date(ev.date).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+              : "Scheduled";
           }
 
           const card = document.createElement("div");
@@ -200,3 +205,4 @@
   </script>
 </body>
 </html>
+
