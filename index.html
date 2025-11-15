@@ -1,208 +1,98 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8">
   <title>Top 25 Live Scoreboard</title>
-
   <style>
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      padding: 0;
-      background: #111;
-      color: #fff;
-      font-family: Arial, sans-serif;
-      overflow: hidden;
+    body { margin:0; background:#111; color:#fff; font-family:Arial; }
+    #grid {
+      display:grid;
+      grid-template-columns:repeat(6,1fr);
+      gap:12px; padding:20px;
     }
-
-    #statusBar {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 32px;
-      background: #181818;
-      color: #ccc;
-      font-size: 13px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 14px;
-      z-index: 10;
-      border-bottom: 1px solid #333;
-    }
-
-    #statusBar button {
-      background: #2b6cb0;
-      border: none;
-      color: #fff;
-      padding: 4px 10px;
-      border-radius: 5px;
-      cursor: pointer;
-      font-size: 12px;
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(6, 1fr);
-      grid-template-rows: repeat(4, 1fr);
-      gap: 12px;
-      padding: 46px 10px 10px;
-      height: 100vh;
-    }
-
     .card {
-      background: #1e1e1e;
-      border-radius: 10px;
-      padding: 10px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      min-width: 0;
+      background:#1e1e1e;
+      padding:12px;
+      border-radius:10px;
     }
-
-    .teams-row { display: flex; flex-direction: column; gap: 6px; }
-
-    .team {
-      display: grid;
-      grid-template-columns: 24px 1fr min-content;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .team-logo {
-      width: 24px;
-      height: 24px;
-      object-fit: contain;
-    }
-
-    .team-name {
-      font-size: 15px;
-      font-weight: 600;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .rank { color: #0af; margin-right: 4px; }
-
-    .score {
-      font-size: 30px;
-      font-weight: 700;
-      text-align: right;
-      min-width: 36px;
-    }
-
-    .meta {
-      font-size: 12px;
-      opacity: 0.8;
-      margin-top: 6px;
-      display: flex;
-      justify-content: space-between;
-    }
-
-    .live { color: #0f0; }
-    .final { color: #ff6b6b; }
-    .scheduled { color: #ccc; }
+    .team { display:flex; justify-content:space-between; font-size:18px; }
+    .meta { font-size:12px; opacity:0.7; margin-top:6px; }
+    .live { color:#0f0; font-weight:bold; }
+    .final { color:#f66; }
   </style>
 </head>
 
 <body>
-  <div id="statusBar">
-    <span id="statusText">Loading Top 25 Live Scores…</span>
-    <button onclick="loadScoreboard()">Refresh</button>
-  </div>
+<h2 style="padding:10px">Top 25 Live Scoreboard</h2>
+<div id="grid"></div>
 
-  <div class="grid" id="scoreGrid"></div>
+<script>
+// JSONP loader
+function loadJSONP(url) {
+  return new Promise(resolve => {
+    const cb = "cb" + Math.floor(Math.random()*99999);
+    window[cb] = data => resolve(data);
+    const script = document.createElement("script");
+    script.src = url + "?callback=" + cb;
+    document.body.appendChild(script);
+  });
+}
 
-  <script>
-    const grid = document.getElementById("scoreGrid");
-    const statusText = document.getElementById("statusText");
+async function loadScores() {
+  const data = await loadJSONP("https://site.web.api.espn.com/apis/v2/sports/football/college-football/scoreboard");
 
-    async function loadScoreboard() {
-      try {
-        statusText.textContent = "Updating…";
+  const events = data.events || [];
+  const top25 = events.filter(ev =>
+    ev.competitions[0].competitors.some(t => t.rank && t.rank <= 25)
+  );
 
-        // ⭐ FIX: Working CORS proxy to allow ESPN requests
-        const url =
-          "https://corsproxy.io/?https://site.web.api.espn.com/apis/v2/sports/football/college-football/scoreboard";
+  const grid = document.getElementById("grid");
+  grid.innerHTML = "";
 
-        const res = await fetch(url);
-        const data = await res.json();
+  top25.forEach(ev => {
+    const comp = ev.competitions[0];
+    const c1 = comp.competitors[0];
+    const c2 = comp.competitors[1];
 
-        const events = data.events || [];
+    const home = c1.homeAway === "home" ? c1 : c2;
+    const away = c1.homeAway === "away" ? c1 : c2;
 
-        // Filter Top 25 teams
-        const top25 = events.filter(ev => {
-          return ev.competitions[0].competitors.some(t => t.rank && t.rank <= 25);
-        });
+    const s = ev.status;
+    let statusLabel = "";
+    let statusClass = "";
 
-        grid.innerHTML = "";
-
-        top25.slice(0, 24).forEach(ev => {
-          const comp = ev.competitions[0];
-          const c1 = comp.competitors[0];
-          const c2 = comp.competitors[1];
-
-          const home = c1.homeAway === "home" ? c1 : c2;
-          const away = c1.homeAway === "away" ? c1 : c2;
-
-          const status = ev.status.type.name;
-
-          let statusLabel = "";
-          let statusClass = "";
-
-          if (status === "STATUS_IN_PROGRESS") {
-            statusClass = "live";
-            statusLabel = `${ev.status.period}Q ${ev.status.displayClock}`;
-          } else if (status === "STATUS_FINAL") {
-            statusClass = "final";
-            statusLabel = "Final";
-          } else {
-            statusClass = "scheduled";
-            statusLabel = ev.date
-              ? new Date(ev.date).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
-              : "Scheduled";
-          }
-
-          const card = document.createElement("div");
-          card.className = "card";
-
-          card.innerHTML = `
-            <div class="teams-row">
-              <div class="team">
-                <img class="team-logo" src="${away.team.logo}" />
-                <div class="team-name">${away.rank ? `<span class='rank'>#${away.rank}</span>` : ""}${away.team.displayName}</div>
-                <div class="score">${away.score ?? "-"}</div>
-              </div>
-              <div class="team">
-                <img class="team-logo" src="${home.team.logo}" />
-                <div class="team-name">${home.rank ? `<span class='rank'>#${home.rank}</span>` : ""}${home.team.displayName}</div>
-                <div class="score">${home.score ?? "-"}</div>
-              </div>
-            </div>
-
-            <div class="meta">
-              <span>${comp.venue?.fullName || ""}</span>
-              <span class="${statusClass}">${statusLabel}</span>
-            </div>
-          `;
-
-          grid.appendChild(card);
-        });
-
-        statusText.textContent = `Top 25 Live Scoreboard (${top25.length} games)`;
-
-      } catch (err) {
-        console.error(err);
-        statusText.textContent = "Error loading scores";
-      }
+    if (s.type.name === "STATUS_IN_PROGRESS") {
+      statusClass = "live";
+      statusLabel = `${s.period}Q ${s.displayClock}`;
+    } else if (s.type.name === "STATUS_FINAL") {
+      statusClass = "final";
+      statusLabel = "Final";
+    } else {
+      statusLabel = new Date(ev.date).toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
     }
 
-    // Load immediately + refresh every 10 seconds
-    loadScoreboard();
-    setInterval(loadScoreboard, 10000);
-  </script>
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <div class="team">
+        <span>${away.rank ? "#" + away.rank + " " : ""}${away.team.displayName}</span>
+        <strong>${away.score ?? "-"}</strong>
+      </div>
+      <div class="team">
+        <span>${home.rank ? "#" + home.rank + " " : ""}${home.team.displayName}</span>
+        <strong>${home.score ?? "-"}</strong>
+      </div>
+      <div class="meta ${statusClass}">
+        ${statusLabel}
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+loadScores();
+setInterval(loadScores, 15000);
+</script>
+
 </body>
 </html>
-
