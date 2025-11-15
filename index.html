@@ -1,83 +1,124 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Top 25 Scoreboard</title>
+<title>Top 25 NCAA Scoreboard</title>
 
 <style>
-  body { margin:0; background:#111; color:#fff; font-family:Arial; }
-  h2 { padding:12px; margin:0; }
-  #grid {
-    display:grid;
-    grid-template-columns:repeat(6,1fr);
-    gap:12px;
-    padding:12px;
-  }
-  .card {
-    background:#1e1e1e;
-    padding:12px;
-    border-radius:10px;
-  }
-  .team { display:flex; justify-content:space-between; font-size:16px; }
-  .meta { margin-top:6px; font-size:12px; opacity:0.7; }
-  .live { color:#0f0; font-weight:bold; }
-  .final { color:#f55; }
+    body {
+        margin: 0;
+        background: #111;
+        color: #fff;
+        font-family: Arial, sans-serif;
+    }
+
+    h1 {
+        margin: 0;
+        padding: 16px;
+        background: #000;
+        border-bottom: 1px solid #333;
+        font-size: 24px;
+    }
+
+    #grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 14px;
+        padding: 16px;
+    }
+
+    .card {
+        background: #1c1c1c;
+        padding: 14px;
+        border-radius: 10px;
+        border: 1px solid #333;
+    }
+
+    .team {
+        display: flex;
+        justify-content: space-between;
+        font-size: 18px;
+        margin: 4px 0;
+    }
+
+    .meta {
+        margin-top: 10px;
+        font-size: 13px;
+        opacity: 0.75;
+    }
+
+    .live { color: #00ff6a; font-weight: bold; }
+    .final { color: #ff5c5c; font-weight: bold; }
 </style>
 </head>
 
 <body>
 
-<h2>Top 25 Scoreboard</h2>
+<h1>Top 25 NCAA Football Scoreboard</h1>
 <div id="grid"></div>
 
 <script>
 async function loadScores() {
-  const res = await fetch("https://ncaa-api.henrygd.me/scoreboard?division=fbs");
-  const data = await res.json();
+    const url = "https://ncaa-api.henrygd.me/scoreboard?division=fbs";
 
-  const events = data.games || [];
-
-  // Only Top 25 teams
-  const top25 = events.filter(g =>
-    g.teams.some(t => t.rank && t.rank <= 25)
-  );
-
-  const grid = document.getElementById("grid");
-  grid.innerHTML = "";
-
-  top25.forEach(game => {
-    const home = game.teams.find(t => t.home_away === "home");
-    const away = game.teams.find(t => t.home_away === "away");
-
-    let statusClass = "";
-    let statusLabel = game.status?.type || "Scheduled";
-
-    if (game.status?.type === "in") {
-      statusClass = "live";
-      statusLabel = `${game.status?.current_period}Q ${game.status?.display_clock}`;
-    }
-    if (game.status?.type === "final") {
-      statusClass = "final";
-      statusLabel = "Final";
+    let res, data;
+    try {
+        res = await fetch(url);
+        data = await res.json();
+    } catch (err) {
+        console.error("Score load failed:", err);
+        return;
     }
 
-    const card = document.createElement("div");
-    card.className = "card";
-    card.innerHTML = `
-      <div class="team">
-        <span>${away.rank ? "#" + away.rank + " " : ""}${away.school}</span>
-        <strong>${away.points ?? "-"}</strong>
-      </div>
-      <div class="team">
-        <span>${home.rank ? "#" + home.rank + " " : ""}${home.school}</span>
-        <strong>${home.points ?? "-"}</strong>
-      </div>
-      <div class="meta ${statusClass}">${statusLabel}</div>
-    `;
-    grid.appendChild(card);
-  });
+    const games = data.games || [];
+
+    // Only include Top 25 games
+    const top25 = games.filter(g =>
+        g.teams.some(t => t.rank && t.rank <= 25)
+    );
+
+    const grid = document.getElementById("grid");
+    grid.innerHTML = "";
+
+    top25.forEach(game => {
+        const home = game.teams.find(t => t.home_away === "home");
+        const away = game.teams.find(t => t.home_away === "away");
+
+        let statusClass = "";
+        let statusLabel = game.status?.type || "Scheduled";
+
+        if (game.status?.type === "in") {
+            statusClass = "live";
+            statusLabel = `${game.status.current_period}Q — ${game.status.display_clock}`;
+        }
+        if (game.status?.type === "final") {
+            statusClass = "final";
+            statusLabel = "Final";
+        }
+
+        const card = document.createElement("div");
+        card.className = "card";
+
+        card.innerHTML = `
+            <div class="team">
+                <span>${away.rank ? "#" + away.rank + " " : ""}${away.school}</span>
+                <strong>${away.points ?? "-"}</strong>
+            </div>
+            <div class="team">
+                <span>${home.rank ? "#" + home.rank + " " : ""}${home.school}</span>
+                <strong>${home.points ?? "-"}</strong>
+            </div>
+
+            <div class="meta ${statusClass}">
+                ${statusLabel}
+            </div>
+        `;
+
+        grid.appendChild(card);
+    });
 }
 
+// Load immediately, refresh every 15s
 loadScores();
 setInterval(loadScores, 15000);
 </script>
