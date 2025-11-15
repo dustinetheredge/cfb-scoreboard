@@ -1,24 +1,23 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Top 25 Live Scoreboard</title>
-
-  <style>
-    body { margin:0; background:#111; color:#fff; font-family:Arial; }
-    #status { padding:10px; background:#181818; border-bottom:1px solid #333; }
-    #grid {
-      display:grid;
-      grid-template-columns:repeat(6,1fr);
-      gap:12px;
-      padding:20px;
-    }
-    .card { background:#1e1e1e; padding:12px; border-radius:10px; }
-    .team { display:flex; justify-content:space-between; }
-    .meta { margin-top:6px; font-size:12px; opacity:0.7; }
-    .live { color:#0f0; }
-    .final { color:#f66; }
-  </style>
+<meta charset="UTF-8">
+<title>Top 25 Live Scoreboard</title>
+<style>
+  body { margin:0; background:#111; color:#fff; font-family:Arial; }
+  #status { padding:10px; background:#181818; border-bottom:1px solid #333; }
+  #grid {
+    display:grid;
+    grid-template-columns:repeat(6,1fr);
+    gap:12px;
+    padding:20px;
+  }
+  .card { background:#1e1e1e; padding:12px; border-radius:10px; }
+  .team { display:flex; justify-content:space-between; }
+  .meta { margin-top:6px; font-size:12px; opacity:0.7; }
+  .live { color:#0f0; }
+  .final { color:#f66; }
+</style>
 </head>
 
 <body>
@@ -31,14 +30,18 @@ async function loadScores() {
   try {
     document.getElementById("status").textContent = "Updating…";
 
-    const proxy = "https://cors-anywhere.herokuapp.com/";
-    const espnURL = "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard";
+    // ESPN core API (CORS SAFE)
+    const url = "https://sports.core.api.espn.com/v2/sports/football/leagues/college-football/events?limit=250";
 
-    const res = await fetch(proxy + espnURL);
+    const res = await fetch(url);
     const data = await res.json();
 
-    const events = data.events || [];
+    const eventUrls = data.items.map(i => i.$ref);
 
+    // Load each event
+    const events = await Promise.all(eventUrls.map(u => fetch(u).then(r => r.json())));
+
+    // Filter Top 25 teams
     const top25 = events.filter(ev =>
       ev.competitions[0].competitors.some(t => t.rank && t.rank <= 25)
     );
@@ -58,14 +61,14 @@ async function loadScores() {
       let statusLabel = "";
       let statusClass = "";
 
-      if (s.type.name === "STATUS_IN_PROGRESS") {
+      if (s.type === "in") {
         statusClass = "live";
-        statusLabel = `${s.period}Q • ${s.displayClock}`;
-      } else if (s.type.name === "STATUS_FINAL") {
+        statusLabel = `${s.period}Q • ${s.clock}`;
+      } else if (s.type === "post") {
         statusClass = "final";
         statusLabel = "Final";
       } else {
-        statusLabel = new Date(ev.date).toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
+        statusLabel = new Date(ev.date).toLocaleTimeString([], { hour:"numeric", minute:"2-digit" });
       }
 
       const card = document.createElement("div");
